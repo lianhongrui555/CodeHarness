@@ -123,6 +123,14 @@ class AgentLoop:
         # 读取工具定义。
         tool_schemas = self.tools.to_api_schemas()
 
+        # 标记当前是否存在未解决的工具错误。
+        error_recovery_pending = False
+
+        # 限制模型在工具失败后忽略错误直接作答的次数。
+        error_recovery_attempts = 0
+
+        # 保存最后一次工具错误。
+        last_tool_error = ""
         # 逐轮执行 Agent Loop。
         for step in range(1, self.max_steps + 1):
             # 在调用模型前按需压缩上下文。
@@ -176,11 +184,50 @@ class AgentLoop:
                 tool_call_count=len(assistant_message.tool_calls),
             )
 
-            # 如果没有工具调用，说明模型给出了最终回答。
+            # 如果没有工具调用，说明模型准备给出最终回答。
             if not assistant_message.tool_calls:
-                # 发送运行结束事件。
+                # 如果上一次工具失败，不能直接接受模型回答。
+                if error_recovery_pending:
+                    # 记录模型再次忽略工具错误的次数。
+                    error_recovery_attempts += 1
+
+                    # 超过一次修正机会后，拒绝模型编造结果。
+                    if error_recovery_attempts > 1:
+                        # 生成明确、不可验证的失败回答。
+                        final_content = "工具执行失败，未获得可验证结果。"
+
+                        # 发出错误事件。
+                        self._emit(
+                            EventType.ERROR,
+                            stage="tool_recovery",
+                            message=f"模型未重新调用工具，最后错误：{last_tool_error}",
+                        )
+
+                        # 发出运行结束事件。
+                        self._emit(EventType.RUN_FINISHED, steps=step, stop_reason="tool_error")
+
+                        # 返回失败结果，而不是接受编造内容。
+                        return AgentRunResult(
+                            final_content=final_content,
+                            messages=messages,
+                            steps=step,
+                            stop_reason="tool_error",
+                            finished=False,
+                        )
+
+                    # 提醒模型必须修正参数并重新调用工具。
+                    messages.append(
+                        Message.system(
+                            "上一次工具调用失败。不得根据记忆或猜测编造工具结果。"
+                            "你必须使用真实参数重新调用工具；如果无法完成，请明确说明工具执行失败。"
+                        )
+                    )
+
+                    # 进入下一轮，让模型有机会修正。
+                    continue
+
+                # 没有工具错误时正常返回最终回答。
                 self._emit(EventType.RUN_FINISHED, steps=step, stop_reason="completed")
-                # 返回最终结果。
                 return AgentRunResult(
                     final_content=assistant_message.content,
                     messages=messages,
@@ -190,6 +237,8 @@ class AgentLoop:
                 )
 
             # 逐个执行模型请求的工具。
+            # 记录本轮工具调用是否发生错误。
+            cycle_had_error = False
             for tool_call in assistant_message.tool_calls:
                 # 读取工具名称和参数。
                 tool_name = tool_call.function.name
@@ -215,6 +264,8 @@ class AgentLoop:
                     # 将工具错误转成可回填给模型的文本。
                     tool_result = f"工具执行失败：{error}"
                     is_error = True
+                    cycle_had_error = True
+                    last_tool_error = str(error)
 
                 # 把工具结果加入消息历史。
                 messages.append(Message.tool_result(tool_call.id, tool_result, name=tool_name))
@@ -228,6 +279,13 @@ class AgentLoop:
                     result=tool_result,
                     is_error=is_error,
                 )
+
+            # 根据本轮结果更新错误恢复状态。
+            if cycle_had_error:
+                error_recovery_pending = True
+            else:
+                error_recovery_pending = False
+                error_recovery_attempts = 0
 
         # 达到最大步数后停止，避免无限循环。
         self._emit(EventType.RUN_FINISHED, steps=self.max_steps, stop_reason="max_steps")

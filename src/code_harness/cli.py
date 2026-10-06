@@ -28,6 +28,7 @@ from code_harness.sessions.store import SessionStore
 from code_harness.tools.calculator import CalculatorTool
 from code_harness.tools.filesystem import ListFilesTool, ReadFileTool
 from code_harness.tools.registry import ToolRegistry
+from code_harness.tools.search import SearchTextTool
 from code_harness.workspace import Workspace
 
 
@@ -130,6 +131,7 @@ def create_runtime(args: argparse.Namespace) -> tuple[OllamaProvider, AgentLoop]
     # 注册只读文件工具。
     registry.register(ListFilesTool(workspace))
     registry.register(ReadFileTool(workspace))
+    registry.register(SearchTextTool(workspace))
 
     # 创建上下文压缩器。
     context_compressor = ContextCompressor(

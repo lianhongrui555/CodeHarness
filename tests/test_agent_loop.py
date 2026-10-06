@@ -119,8 +119,48 @@ def test_loop_executes_tool_and_returns_final_answer() -> None:
     assert EventType.TOOL_RESULT in [event.type for event in events]
 
 
-def test_loop_sends_tool_error_back_to_model() -> None:
-    """未知工具错误应回填给模型，而不是让程序崩溃。"""
+def test_loop_recovers_after_tool_error() -> None:
+    """工具失败后，模型修正参数并重新调用，应继续完成任务。"""
+
+    # 第一次请求未知工具。
+    bad_call = ToolCall(
+        id="call-bad",
+        function=ToolCallFunction(name="unknown_tool", arguments={}),
+    )
+
+    # 第二次请求正确的计算器工具。
+    good_call = ToolCall(
+        id="call-good",
+        function=ToolCallFunction(name="calculator", arguments={"expression": "6*7"}),
+    )
+
+    # 模型第一次失败，第二次忽略错误，第三次修正工具，第四次给出最终答案。
+    provider = FakeProvider(
+        [
+            Message.assistant(tool_calls=[bad_call]),
+            Message.assistant("我想直接给答案。"),
+            Message.assistant(tool_calls=[good_call]),
+            Message.assistant("最终结果是 42。"),
+        ]
+    )
+
+    # 创建 Agent Loop。
+    loop = AgentLoop(provider, make_registry())
+
+    # 执行任务。
+    result = loop.run("请计算 6*7")
+
+    # 应正常完成。
+    assert result.finished is True
+    assert result.final_content == "最终结果是 42。"
+
+    # 第三次请求模型时应看到错误恢复提示。
+    recovery_messages = provider.calls[2]
+    assert any("不得根据记忆或猜测编造" in message.content for message in recovery_messages)
+
+
+def test_loop_rejects_fabricated_answer_after_tool_error() -> None:
+    """模型连续忽略工具错误时，Harness 必须拒绝编造答案。"""
 
     # 创建未知工具调用。
     tool_call = ToolCall(
@@ -128,11 +168,12 @@ def test_loop_sends_tool_error_back_to_model() -> None:
         function=ToolCallFunction(name="unknown_tool", arguments={}),
     )
 
-    # 第一轮调用错误工具，第二轮返回解释。
+    # 第一次失败，后两次模型都拒绝重新调用工具。
     provider = FakeProvider(
         [
             Message.assistant(tool_calls=[tool_call]),
-            Message.assistant("没有找到该工具。"),
+            Message.assistant("这是编造的答案。"),
+            Message.assistant("这仍然是编造的答案。"),
         ]
     )
 
@@ -142,10 +183,10 @@ def test_loop_sends_tool_error_back_to_model() -> None:
     # 执行任务。
     result = loop.run("调用一个不存在的工具")
 
-    # 验证工具错误被记录。
-    tool_message = next(message for message in result.messages if message.role.value == "tool")
-    assert "工具执行失败" in tool_message.content
-    assert result.final_content == "没有找到该工具。"
+    # 不应接受模型编造的内容。
+    assert result.finished is False
+    assert result.stop_reason == "tool_error"
+    assert result.final_content == "工具执行失败，未获得可验证结果。"
 
 
 def test_loop_stops_at_max_steps() -> None:

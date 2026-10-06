@@ -43,3 +43,9 @@ code-harness --workspace D:\CodeHarness --session demo --resume "刚才的数字
 ```powershell
 code-harness --workspace D:\CodeHarness --max-context-tokens 12000 --keep-recent-messages 8 "继续分析项目"
 ```
+
+## 搜索代码
+
+```powershell
+code-harness --workspace D:\CodeHarness "请搜索 CalculatorTool 并总结它的作用。"
+```
