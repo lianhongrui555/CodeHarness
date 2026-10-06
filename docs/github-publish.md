@@ -8,7 +8,69 @@
 - 尚未配置 GitHub 远程仓库。
 - 当前电脑尚未安装 GitHub CLI，也未完成 GitHub 登录。
 
-## 推荐发布步骤
+## 方法一：浏览器创建仓库并推送（推荐）
+
+不需要安装 GitHub CLI。
+
+### 1. 在浏览器创建空仓库
+
+打开：
+
+https://github.com/new
+
+填写仓库名称：
+
+```text
+CodeHarness
+```
+
+选择 Public 或 Private。不要勾选 README、.gitignore 或 License，因为本地仓库已经包含项目文件。
+
+### 2. 复制仓库地址
+
+创建后复制 HTTPS 地址，格式类似：
+
+```text
+https://github.com/你的用户名/CodeHarness.git
+```
+
+不要把 GitHub 密码或 Token 发到聊天中。
+
+### 3. 配置远程仓库
+
+在 PowerShell 执行：
+
+```powershell
+cd D:\CodeHarness
+git remote add origin https://github.com/你的用户名/CodeHarness.git
+git branch -M main
+```
+
+如果提示 `origin` 已经存在，改用：
+
+```powershell
+git remote set-url origin https://github.com/你的用户名/CodeHarness.git
+```
+
+### 4. 推送
+
+```powershell
+git push -u origin main
+```
+
+第一次推送时，Git Credential Manager 会打开浏览器或登录窗口。选择 GitHub 账号并授权即可。
+
+### 5. 验证
+
+```powershell
+git remote -v
+git status
+```
+
+浏览器刷新 GitHub 仓库页面，应能看到完整的代码、提交记录和工程日志。
+
+## 方法二：GitHub CLI
+
 
 ### 1. 安装 GitHub CLI
 
