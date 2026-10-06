@@ -24,3 +24,9 @@ code-harness --interactive
 - `/exit`：退出程序
 
 后续将加入项目结构和文件读取示例。
+
+## 只读项目分析
+
+```powershell
+code-harness --workspace D:\CodeHarness "请列出项目根目录，读取 README.md 前 15 行，并总结项目。"
+```

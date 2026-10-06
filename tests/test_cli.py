@@ -21,6 +21,7 @@ def test_cli_defaults() -> None:
     assert args.max_steps == 8
     assert args.temperature == 0.1
     assert args.interactive is False
+    assert args.workspace is None
 
 
 def test_event_printer_outputs_tool_result(capsys) -> None:

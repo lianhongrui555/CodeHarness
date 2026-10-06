@@ -7,6 +7,7 @@ import argparse
 import sys
 
 # 导入类型工具。
+from pathlib import Path
 from typing import Sequence
 
 # 导入 Agent Loop。
@@ -23,7 +24,9 @@ from code_harness.providers.ollama import OllamaProvider
 
 # 导入计算器工具和注册表。
 from code_harness.tools.calculator import CalculatorTool
+from code_harness.tools.filesystem import ListFilesTool, ReadFileTool
 from code_harness.tools.registry import ToolRegistry
+from code_harness.workspace import Workspace
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,6 +40,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 添加一次性任务参数。
     parser.add_argument("task", nargs="?", help="要交给 Agent 的任务。")
+
+    parser.add_argument("--workspace", help="允许 Agent 访问的项目目录，默认使用当前目录。")
 
     # 添加模型参数。
     parser.add_argument("--model", help="Ollama 模型名称，默认读取 OLLAMA_MODEL。")
@@ -94,11 +99,18 @@ def create_runtime(args: argparse.Namespace) -> tuple[OllamaProvider, AgentLoop]
     # 创建 Ollama Provider。
     provider = OllamaProvider(base_url=args.base_url, model=args.model)
 
+    # 创建受限工作目录。
+    workspace = Workspace(args.workspace or Path.cwd())
+
     # 创建工具注册表。
     registry = ToolRegistry()
 
     # 注册安全计算器。
     registry.register(CalculatorTool())
+
+    # 注册只读文件工具。
+    registry.register(ListFilesTool(workspace))
+    registry.register(ReadFileTool(workspace))
 
     # 创建 Agent Loop。
     loop = AgentLoop(
