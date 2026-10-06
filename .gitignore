@@ -1,0 +1,23 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 本地环境变量和密钥
+.env
+.env.*
+
+# 编辑器和系统文件
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# 运行产物
+logs/*.jsonl
+*.log

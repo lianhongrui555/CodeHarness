@@ -1,0 +1,2 @@
+[console_scripts]
+code-harness = code_harness.cli:main
