@@ -21,3 +21,4 @@ Desktop.ini
 # 运行产物
 logs/*.jsonl
 *.log
+*.egg-info/
