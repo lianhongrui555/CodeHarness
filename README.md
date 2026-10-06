@@ -78,3 +78,7 @@ CodeHarness/
 - [x] 实现上下文压缩
 - [x] 实现代码搜索
 - [x] 实现 Git 状态、差异和提交历史工具
+
+## GitHub 发布
+
+发布步骤见 docs/github-publish.md。
