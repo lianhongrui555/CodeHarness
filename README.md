@@ -68,7 +68,7 @@ CodeHarness/
 - [x] 建立工程目录
 - [x] 编写架构说明
 - [x] 定义消息结构
-- [ ] 实现最小 Agent Loop
+- [x] 实现最小 Agent Loop
 - [x] 实现 Ollama 模型适配器
 - [x] 实现工具注册表
 - [x] 实现数学工具

@@ -1,6 +1,7 @@
 """本地 Ollama 模型供应商。"""
 
 # 导入系统环境变量工具。
+import json
 import os
 
 # 导入类型工具。
@@ -40,6 +41,39 @@ class OllamaProvider(BaseProvider):
         # 允许测试注入假 Session，也允许真实运行时创建新 Session。
         self.session = session or requests.Session()
 
+    def _message_to_ollama(self, message: Message) -> dict[str, Any]:
+        """把内部消息转换成 Ollama 原生接口格式。"""
+
+        # 先转换为通用接口格式。
+        data = message.to_api_dict()
+
+        # Ollama 原生工具调用要求 arguments 是对象，而不是 JSON 字符串。
+        for tool_call in data.get("tool_calls", []):
+            # 读取函数定义。
+            function = tool_call.get("function") or {}
+
+            # 读取参数。
+            arguments = function.get("arguments")
+
+            # 如果参数是字符串，就尝试解析成对象。
+            if isinstance(arguments, str):
+                try:
+                    # 空字符串按空对象处理。
+                    function["arguments"] = json.loads(arguments) if arguments else {}
+                except json.JSONDecodeError as error:
+                    # 参数非法时给出明确错误。
+                    raise ProviderError(f"工具参数不是合法 JSON：{arguments}") from error
+
+        # 工具结果消息使用 tool_name 字段。
+        if message.role.value == "tool":
+            # 保存工具名称。
+            data["tool_name"] = message.name or ""
+            # 移除 OpenAI 风格的字段，避免原生接口校验失败。
+            data.pop("name", None)
+            data.pop("tool_call_id", None)
+
+        # 返回 Ollama 格式消息。
+        return data
     def _url(self, path: str) -> str:
         """拼接 Ollama API 地址。"""
 
@@ -92,7 +126,7 @@ class OllamaProvider(BaseProvider):
             # 指定使用的模型。
             "model": self.model,
             # 把内部消息转换成接口格式。
-            "messages": [message.to_api_dict() for message in messages],
+            "messages": [self._message_to_ollama(message) for message in messages],
             # 第一版不使用流式输出，方便调试完整结果。
             "stream": False,
         }
@@ -122,6 +156,12 @@ class OllamaProvider(BaseProvider):
         except requests.Timeout as error:
             # 明确处理超时。
             raise ProviderError(f"Ollama 请求超时，模型：{self.model}") from error
+        except requests.HTTPError as error:
+            # 保留 Ollama 返回正文，方便定位请求格式问题。
+            response_text = ""
+            if error.response is not None:
+                response_text = error.response.text[:1000]
+            raise ProviderError(f"Ollama 返回 HTTP 错误：{error}，详情：{response_text}") from error
         except requests.RequestException as error:
             # 处理其他网络错误。
             raise ProviderError(f"Ollama 请求失败：{error}") from error

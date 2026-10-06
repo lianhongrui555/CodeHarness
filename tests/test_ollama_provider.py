@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 # 导入消息类型。
-from code_harness.core.messages import Message, Role
+from code_harness.core.messages import Message, Role, ToolCall, ToolCallFunction
 
 # 导入供应商和异常。
 from code_harness.providers.base import ProviderError
@@ -161,3 +161,37 @@ def test_health_and_list_models() -> None:
 
     # 健康检查应返回原始数据。
     assert "models" in provider.health()
+
+def test_ollama_converts_native_tool_message_format() -> None:
+    """发送工具历史时应使用 Ollama 原生格式。"""
+
+    # 创建最终回答响应。
+    session = FakeSession(FakeResponse({"message": {"role": "assistant", "content": "done"}}))
+
+    # 创建助手工具调用消息。
+    assistant_message = Message.assistant(
+        tool_calls=[
+            ToolCall(
+                id="call-1",
+                function=ToolCallFunction(name="calculator", arguments={"expression": "1+1"}),
+            )
+        ]
+    )
+
+    # 创建工具结果消息。
+    tool_message = Message.tool_result("call-1", "2", name="calculator")
+
+    # 创建 Provider 并发送历史。
+    provider = OllamaProvider(session=session)
+    provider.chat([assistant_message, tool_message])
+
+    # 读取实际发送给 Ollama 的消息。
+    sent_messages = session.last_call["json"]["messages"]
+
+    # Ollama 原生接口要求 arguments 是对象。
+    assert sent_messages[0]["tool_calls"][0]["function"]["arguments"] == {"expression": "1+1"}
+
+    # 工具结果应使用 tool_name，而不是 OpenAI 的 name/tool_call_id。
+    assert sent_messages[1]["tool_name"] == "calculator"
+    assert "name" not in sent_messages[1]
+    assert "tool_call_id" not in sent_messages[1]
