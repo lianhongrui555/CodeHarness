@@ -12,6 +12,7 @@ from typing import Sequence
 
 # 导入 Agent Loop。
 from code_harness.agent.loop import AgentLoop, AgentLoopError, AgentRunResult
+from code_harness.context.compressor import ContextCompressor
 
 # 导入事件类型。
 from code_harness.core.events import AgentEvent, EventType
@@ -61,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # 添加恢复会话参数。
     parser.add_argument("--resume", action="store_true", help="恢复 --session 指定的最新会话。")
+    # 添加上下文 token 上限。
+    parser.add_argument("--max-context-tokens", type=int, default=12000, help="触发上下文压缩的估算 token 上限。")
+
+    # 添加最近消息保留数量。
+    parser.add_argument("--keep-recent-messages", type=int, default=8, help="压缩时保留的最近消息数量。")
     # 添加强制交互模式。
     parser.add_argument("--interactive", action="store_true", help="进入连续对话模式。")
 
@@ -91,6 +97,13 @@ def create_event_printer():
             prefix = "[工具错误]" if event.data.get("is_error") else "[工具结果]"
             print(f"{prefix} {event.data.get('result')}")
 
+        # 上下文压缩完成。
+        elif event.type is EventType.CONTEXT_COMPRESSED:
+            print(
+                f"[上下文] 已压缩 {event.data.get('before_count')} 条消息为 {event.data.get('after_count')} 条"
+            )
+
+
         # 错误事件。
         elif event.type is EventType.ERROR:
             print(f"[错误] {event.data.get('message')}", file=sys.stderr)
@@ -118,11 +131,19 @@ def create_runtime(args: argparse.Namespace) -> tuple[OllamaProvider, AgentLoop]
     registry.register(ListFilesTool(workspace))
     registry.register(ReadFileTool(workspace))
 
+    # 创建上下文压缩器。
+    context_compressor = ContextCompressor(
+        provider=provider,
+        max_tokens=args.max_context_tokens,
+        keep_recent_messages=args.keep_recent_messages,
+    )
+
     # 创建 Agent Loop。
     loop = AgentLoop(
         provider=provider,
         tools=registry,
         max_steps=args.max_steps,
+        context_compressor=context_compressor,
         event_sink=create_event_printer(),
     )
 
@@ -205,6 +226,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     # 检查最大步数。
     if args.max_steps < 1:
         parser.error("--max-steps 必须大于等于 1")
+
+    if args.max_context_tokens < 100:
+        parser.error("--max-context-tokens 必须大于等于 100")
+
+    if args.keep_recent_messages < 1:
+        parser.error("--keep-recent-messages 必须大于等于 1")
 
     # --resume 必须同时指定 --session。
     if args.resume and not args.session:

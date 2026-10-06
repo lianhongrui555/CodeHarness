@@ -37,3 +37,9 @@ code-harness --workspace D:\CodeHarness "请列出项目根目录，读取 READM
 code-harness --workspace D:\CodeHarness --session demo "请记住数字 42。"
 code-harness --workspace D:\CodeHarness --session demo --resume "刚才的数字是多少？"
 ```
+
+## 上下文压缩
+
+```powershell
+code-harness --workspace D:\CodeHarness --max-context-tokens 12000 --keep-recent-messages 8 "继续分析项目"
+```

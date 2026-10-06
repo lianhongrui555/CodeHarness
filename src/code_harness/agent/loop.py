@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 # 导入事件类型。
+from code_harness.context.compressor import ContextCompressionError, ContextCompressor
 from code_harness.core.events import AgentEvent, EventType
 
 # 导入消息类型。
@@ -62,6 +63,7 @@ class AgentLoop:
         provider: BaseProvider,
         tools: ToolRegistry,
         max_steps: int = 8,
+        context_compressor: ContextCompressor | None = None,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         event_sink: EventSink | None = None,
     ) -> None:
@@ -75,6 +77,9 @@ class AgentLoop:
 
         # 限制最大模型调用轮数。
         self.max_steps = max_steps
+
+        # 保存可选的上下文压缩器。
+        self.context_compressor = context_compressor
 
         # 保存系统提示词。
         self.system_prompt = system_prompt
@@ -120,6 +125,36 @@ class AgentLoop:
 
         # 逐轮执行 Agent Loop。
         for step in range(1, self.max_steps + 1):
+            # 在调用模型前按需压缩上下文。
+            if self.context_compressor is not None:
+                # 记录压缩前的消息数量。
+                before_count = len(messages)
+
+                # 记录压缩前的估算 token 数。
+                before_tokens = self.context_compressor.estimate_tokens(messages)
+
+                # 使用 try 捕获摘要错误。
+                try:
+                    # 执行压缩。
+                    compressed_messages = self.context_compressor.compress(messages)
+                except ContextCompressionError as error:
+                    # 发送错误事件。
+                    self._emit(EventType.ERROR, stage="compression", message=str(error))
+                    # 终止本次运行。
+                    raise AgentLoopError(f"上下文压缩失败：{error}") from error
+
+                # 只有确实发生变化时才替换消息列表。
+                if compressed_messages is not messages:
+                    messages = compressed_messages
+
+                    # 发送压缩完成事件。
+                    self._emit(
+                        EventType.CONTEXT_COMPRESSED,
+                        before_count=before_count,
+                        after_count=len(messages),
+                        before_tokens=before_tokens,
+                        after_tokens=self.context_compressor.estimate_tokens(messages),
+                    )
             # 使用 try 捕获模型错误。
             try:
                 # 调用模型，并把完整消息历史发过去。

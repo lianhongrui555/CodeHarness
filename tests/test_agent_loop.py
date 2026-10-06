@@ -171,3 +171,45 @@ def test_loop_stops_at_max_steps() -> None:
     assert result.stop_reason == "max_steps"
     assert result.steps == 2
     assert "最大工具调用步数" in result.final_content
+
+class FakeCompressor:
+    """模拟上下文压缩器。"""
+
+    def estimate_tokens(self, messages):
+        """返回固定高 token 值。"""
+
+        return 99999
+
+    def compress(self, messages):
+        """把历史压缩成一条系统摘要和最后一条消息。"""
+
+        return [Message.system("压缩摘要"), messages[-1]]
+
+
+def test_loop_applies_context_compression() -> None:
+    """Agent Loop 应在调用模型前使用压缩后的消息。"""
+
+    # 创建最终回答模型。
+    provider = FakeProvider([Message.assistant("完成")])
+
+    # 收集事件。
+    events = []
+
+    # 创建带假压缩器的 Agent Loop。
+    loop = AgentLoop(
+        provider,
+        make_registry(),
+        context_compressor=FakeCompressor(),
+        event_sink=events.append,
+    )
+
+    # 执行任务。
+    result = loop.run("原始任务")
+
+    # 验证摘要被传给模型。
+    sent_messages = provider.calls[0]
+    assert [message.content for message in sent_messages] == ["压缩摘要", "原始任务"]
+
+    # 验证压缩事件被发出。
+    assert EventType.CONTEXT_COMPRESSED in [event.type for event in events]
+    assert result.final_content == "完成"

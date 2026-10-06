@@ -25,6 +25,9 @@ class EventType(StrEnum):
     # 工具执行完成。
     TOOL_RESULT = "tool_result"
 
+    # 上下文完成压缩。
+    CONTEXT_COMPRESSED = "context_compressed"
+
     # 一次 Agent 运行结束。
     RUN_FINISHED = "run_finished"
 
