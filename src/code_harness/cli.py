@@ -29,6 +29,7 @@ from code_harness.tools.calculator import CalculatorTool
 from code_harness.tools.filesystem import ListFilesTool, ReadFileTool
 from code_harness.tools.registry import ToolRegistry
 from code_harness.tools.search import SearchTextTool
+from code_harness.tools.git_tools import GitDiffTool, GitLogTool, GitStatusTool
 from code_harness.workspace import Workspace
 
 
@@ -132,6 +133,9 @@ def create_runtime(args: argparse.Namespace) -> tuple[OllamaProvider, AgentLoop]
     registry.register(ListFilesTool(workspace))
     registry.register(ReadFileTool(workspace))
     registry.register(SearchTextTool(workspace))
+    registry.register(GitStatusTool(workspace))
+    registry.register(GitDiffTool(workspace))
+    registry.register(GitLogTool(workspace))
 
     # 创建上下文压缩器。
     context_compressor = ContextCompressor(

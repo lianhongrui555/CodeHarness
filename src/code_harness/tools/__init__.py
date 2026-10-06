@@ -7,10 +7,14 @@ from code_harness.tools.base import BaseTool, ToolError, ToolValidationError
 from code_harness.tools.calculator import CalculatorTool
 from code_harness.tools.filesystem import ListFilesTool, ReadFileTool
 from code_harness.tools.search import SearchTextTool
+from code_harness.tools.git_tools import GitDiffTool, GitLogTool, GitStatusTool
 
 # 导出工具注册表。
 from code_harness.tools.registry import ToolRegistry
 
 # 声明公开接口。
 __all__ = ["BaseTool", "CalculatorTool", "ListFilesTool", "ReadFileTool",
-    "SearchTextTool", "ToolError", "ToolRegistry", "ToolValidationError"]
+    "SearchTextTool",
+    "GitStatusTool",
+    "GitDiffTool",
+    "GitLogTool", "ToolError", "ToolRegistry", "ToolValidationError"]

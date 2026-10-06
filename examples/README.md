@@ -49,3 +49,9 @@ code-harness --workspace D:\CodeHarness --max-context-tokens 12000 --keep-recent
 ```powershell
 code-harness --workspace D:\CodeHarness "请搜索 CalculatorTool 并总结它的作用。"
 ```
+
+## 分析 Git
+
+```powershell
+code-harness --workspace D:\CodeHarness "查看 Git 当前状态和最近 5 条提交，并总结开发进度。"
+```
