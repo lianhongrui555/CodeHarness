@@ -22,6 +22,8 @@ def test_cli_defaults() -> None:
     assert args.temperature == 0.1
     assert args.interactive is False
     assert args.workspace is None
+    assert args.session is None
+    assert args.resume is False
 
 
 def test_event_printer_outputs_tool_result(capsys) -> None:

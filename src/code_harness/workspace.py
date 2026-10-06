@@ -30,6 +30,7 @@ class Workspace:
             ".aws",
             ".ssh",
             ".git",
+            ".codeharness",
             "id_rsa",
             "id_ed25519",
         }

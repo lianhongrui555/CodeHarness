@@ -22,3 +22,4 @@ Desktop.ini
 logs/*.jsonl
 *.log
 *.egg-info/
+.codeharness/

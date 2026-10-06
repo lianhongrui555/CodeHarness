@@ -30,3 +30,10 @@ code-harness --interactive
 ```powershell
 code-harness --workspace D:\CodeHarness "请列出项目根目录，读取 README.md 前 15 行，并总结项目。"
 ```
+
+## 会话保存与恢复
+
+```powershell
+code-harness --workspace D:\CodeHarness --session demo "请记住数字 42。"
+code-harness --workspace D:\CodeHarness --session demo --resume "刚才的数字是多少？"
+```

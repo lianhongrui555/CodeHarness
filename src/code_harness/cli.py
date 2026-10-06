@@ -21,6 +21,7 @@ from code_harness.core.messages import Message
 
 # 导入 Ollama Provider。
 from code_harness.providers.ollama import OllamaProvider
+from code_harness.sessions.store import SessionStore
 
 # 导入计算器工具和注册表。
 from code_harness.tools.calculator import CalculatorTool
@@ -55,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     # 添加温度参数。
     parser.add_argument("--temperature", type=float, default=0.1, help="模型温度。")
 
+    # 添加会话编号参数。
+    parser.add_argument("--session", help="保存或恢复指定的会话编号。")
+
+    # 添加恢复会话参数。
+    parser.add_argument("--resume", action="store_true", help="恢复 --session 指定的最新会话。")
     # 添加强制交互模式。
     parser.add_argument("--interactive", action="store_true", help="进入连续对话模式。")
 
@@ -144,7 +150,7 @@ def run_task(loop: AgentLoop, task: str, history: list[Message] | None = None) -
     return result
 
 
-def run_interactive(loop: AgentLoop) -> int:
+def run_interactive(loop: AgentLoop, session_store: SessionStore | None = None, session_id: str | None = None, history: list[Message] | None = None) -> int:
     """进入连续对话模式。"""
 
     # 显示操作提示。
@@ -200,17 +206,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.max_steps < 1:
         parser.error("--max-steps 必须大于等于 1")
 
+    # --resume 必须同时指定 --session。
+    if args.resume and not args.session:
+        parser.error("--resume 必须和 --session 一起使用")
+
+    # 创建会话存储。
+    session_store = SessionStore(args.workspace or Path.cwd()) if args.session else None
+
     # 创建运行组件。
     provider, loop = create_runtime(args)
 
     # 使用 try/finally 确保 HTTP 连接关闭。
     try:
+        # 按需恢复历史消息。
+        history = session_store.load_latest(args.session) if args.resume and session_store and args.session else []
+
         # 没有任务或显式要求交互时进入连续对话。
         if args.interactive or not args.task:
-            return run_interactive(loop)
+            return run_interactive(
+                loop,
+                session_store=session_store,
+                session_id=args.session,
+                history=history,
+            )
 
         # 运行一次性任务。
-        run_task(loop, args.task)
+        result = run_task(loop, args.task, history=history)
+
+        # 有会话编号时保存结果。
+        if session_store is not None and args.session is not None:
+            session_store.append_snapshot(args.session, result.messages)
+            print(f"[会话] 已保存：{args.session}")
+
         return 0
     finally:
         # 关闭 Provider 连接。
